@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction Record App</title>
+  <script type="module" src="./index.js" defer></script>
+</head>
+<body>
+  <h1>Transaction Record App</h1>
+  
+  <div>
+    <label for="amount">Amount:</label>
+    <input type="number" id="amount" placeholder="Enter amount" required>
+  </div>
+  
+  <div>
+    <label for="description">Description:</label>
+    <input type="text" id="description" placeholder="Enter description" required>
+  </div>
+  
+  <button onclick="recordTransaction()">Record Transaction</button>
+  
+  <h2>Transaction History</h2>
+  <ul id="transactionList"></ul>
+
+  <script type="module">
+    import { Principal, Context, HttpAgent, Actor, Service } from 'azle';
+
+    class TransactionCanister extends Actor {
+      private transactions = [];
+
+      @query
+      getTransactionHistory() {
+        return this.transactions;
+      }
+
+      @update
+      recordTransaction(amount, description) {
+        this.validateAmount(amount);
+        this.validateDescription(description);
+
+        const timestamp = new Date().toISOString();
+        const transaction = { timestamp, amount, description };
+        this.transactions.push(transaction);
+      }
+
+      validateAmount(amount) {
+        if (isNaN(amount) || amount <= 0) {
+          throw new Error('Invalid amount. Amount must be a positive number.');
+        }
+      }
+
+      validateDescription(description) {
+        if (!description.trim()) {
+          throw new Error('Description cannot be empty.');
+        }
+      }
+    }
+
+    const agent = new HttpAgent();
+    const context = Context.create({ agent });
+    const transactionCanister = Service.createActor(TransactionCanister, context);
+
+    async function recordTransaction() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const description = document.getElementById('description').value;
+
+      try {
+        await transactionCanister.recordTransaction(amount, description);
+        updateTransactionHistory();
+      } catch (error) {
+        console.error(error.message);
+      }
+    }
+
+    async function updateTransactionHistory() {
+      const transactionHistory = await transactionCanister.getTransactionHistory();
+      const transactionList = document.getElementById('transactionList');
+      transactionList.innerHTML = '';
+
+      transactionHistory.forEach(transaction => {
+        const listItem = document.createElement('li');
+        listItem.textContent = `${transaction.timestamp} - ${transaction.amount} USD: ${transaction.description}`;
+        transactionList.appendChild(listItem);
+      });
+    }
+  </script>
+</body>
+</html>
